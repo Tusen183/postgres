@@ -1,0 +1,30 @@
+charmy_exec_path[MAXPGPATH];
+charpostgres_path[MAXPGPATH];
+chardefault_data_dir[MAXPGPATH];
+
+/* Set default encoding */
+encoding = pg_strdup(UTF8);
+
+/* Detect and set system locale as default (Requirement 2.4) */
+locale = get_system_locale();
+
+/* Set default listen address */
+listen_addresses = pg_strdup(localhost);
+
+/* Set default port */
+port = 5432;
+
+/* Set default max connections */
+max_connections = 100;
+
+/* Set default authentication method */
+authmethodhost = scram-sha-256;
+authmethodlocal = scram-sha-256;
+
+/* Get current username as default superuser */
+username = pg_strdup(get_user_name_or_exit(progname));
+
+/* Set default data directory to ../data relative to installation directory */
+if (find_my_exec(argv0, my_exec_path) < 0)
+{
+pg_log_error(could

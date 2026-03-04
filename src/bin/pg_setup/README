@@ -1,0 +1,734 @@
+pg_setup - PostgreSQL 数据库集群安装和初始化工具
+=====================================================
+
+概述
+----
+
+pg_setup 是一个用于简化 PostgreSQL 数据库安装和初始化过程的命令行工具。
+它提供类似 MySQL setup 的友好交互式安装体验，将 initdb 和 pg_ctl 的功能
+整合到一个统一的工具中。
+
+主要特性：
+- 交互式安装向导，适合首次使用 PostgreSQL 的用户
+- 静默安装模式，支持自动化部署脚本
+- 预定义配置模板（开发、生产、测试）
+- 自动配置数据库认证和网络设置
+- 内置安全性检查和警告
+- 支持配置文件和命令行参数
+- 自动启动数据库服务器（可选）
+
+快速开始
+--------
+
+1. 交互式安装（推荐首次使用）：
+
+   $ pg_setup
+
+   工具会引导您完成所有配置步骤。
+
+2. 使用开发模式快速安装：
+
+   $ pg_setup -D /path/to/data -P development
+
+3. 静默安装（用于自动化脚本）：
+
+   $ pg_setup -s -D /path/to/data -U postgres -P production
+
+4. 生成配置文件模板：
+
+   $ pg_setup -g myconfig.conf
+
+   然后编辑配置文件并使用：
+
+   $ pg_setup -c myconfig.conf
+
+
+命令行参数说明
+--------------
+
+基本选项：
+
+  -h, --help
+      显示帮助信息并退出
+
+  -V, --version
+      显示版本信息并退出
+
+  -s, --silent
+      启用静默模式，不显示交互提示
+      在此模式下，所有配置必须通过命令行参数或配置文件提供
+
+数据目录：
+
+  -D, --pgdata=DATADIR
+      指定数据库集群的数据目录路径
+      默认值：$PGDATA 环境变量或交互式询问
+      示例：-D /var/lib/postgresql/data
+
+字符编码和区域设置：
+
+  -E, --encoding=ENCODING
+      设置新数据库的默认字符编码
+      默认值：UTF8
+      支持的编码：UTF8, SQL_ASCII, LATIN1, EUC_JP 等
+      示例：-E UTF8
+
+  -L, --locale=LOCALE
+      设置新数据库的默认区域设置
+      默认值：系统当前区域设置
+      示例：-L en_US.UTF-8
+
+  --lc-collate=LOCALE
+      设置 LC_COLLATE（排序规则）
+      默认值：与 --locale 相同
+      示例：--lc-collate=en_US.UTF-8
+
+  --lc-ctype=LOCALE
+      设置 LC_CTYPE（字符分类）
+      默认值：与 --locale 相同
+      示例：--lc-ctype=en_US.UTF-8
+
+
+超级用户配置：
+
+  -U, --username=NAME
+      指定数据库超级用户名
+      默认值：当前操作系统用户名
+      示例：-U postgres
+
+  -W, --pwprompt
+      提示输入超级用户密码
+      在交互模式下会自动提示，此选项用于强制在静默模式下提示
+
+  --pwfile=FILE
+      从文件读取超级用户密码
+      文件应包含一行纯文本密码
+      示例：--pwfile=/etc/postgresql/pgpass
+
+网络配置：
+
+  -p, --port=PORT
+      设置数据库监听端口号
+      默认值：5432
+      有效范围：1024-65535
+      示例：-p 5432
+
+  --listen-addresses=ADDR
+      设置监听地址
+      默认值：localhost
+      特殊值：
+        localhost - 仅本地连接
+        * 或 0.0.0.0 - 所有网络接口（会显示安全警告）
+      示例：--listen-addresses=localhost
+
+认证方式：
+
+  -A, --auth=METHOD
+      设置本地和主机连接的默认认证方式
+      默认值：scram-sha-256
+      支持的方法：
+        trust - 无密码认证（仅开发环境）
+        scram-sha-256 - 加密密码认证（推荐）
+        md5 - MD5 密码认证（不推荐）
+        peer - 操作系统用户认证（仅本地）
+      示例：-A scram-sha-256
+
+  --auth-host=METHOD
+      设置 TCP/IP 连接的认证方式
+      覆盖 --auth 对主机连接的设置
+      示例：--auth-host=scram-sha-256
+
+  --auth-local=METHOD
+      设置本地 Unix 套接字连接的认证方式
+      覆盖 --auth 对本地连接的设置
+      示例：--auth-local=peer
+
+
+配置模板：
+
+  -P, --profile=PROFILE
+      使用预定义的配置模板
+      可用模板：
+        development - 开发模式
+          * 宽松的安全设置（trust 认证）
+          * 较少的连接数（20）
+          * 自动启动服务器
+          * 适合本地开发环境
+
+        production - 生产模式
+          * 严格的安全设置（scram-sha-256 认证）
+          * 标准连接数（100）
+          * 不自动启动服务器
+          * 适合生产环境部署
+
+        test - 测试模式
+          * 使用 C locale 确保一致性
+          * 使用不同端口（5433）避免冲突
+          * 较少的连接数（10）
+          * 自动启动服务器
+          * 适合自动化测试
+
+      注意：命令行参数会覆盖模板的默认值
+      示例：-P development
+
+服务器控制：
+
+  --start
+      初始化完成后自动启动数据库服务器
+      这是默认行为
+
+  --no-start
+      初始化完成后不启动数据库服务器
+      适合需要手动配置后再启动的场景
+
+配置文件：
+
+  -c, --config-file=FILE
+      从配置文件读取设置
+      配置文件使用 key=value 格式
+      命令行参数优先于配置文件
+      示例：-c /etc/postgresql/pg_setup.conf
+
+  -g, --generate-config=FILE
+      生成配置文件模板并退出
+      生成的文件包含所有可配置项和注释说明
+      示例：-g myconfig.conf
+
+调试选项：
+
+  -d, --debug
+      启用调试模式，输出详细的调试信息
+
+  -n, --noclean
+      错误时不清理已创建的文件
+      用于调试安装失败的问题
+
+
+配置文件格式
+------------
+
+配置文件使用简单的 key=value 格式。以 # 开头的行是注释，空行会被忽略。
+
+示例配置文件：
+
+    # pg_setup 配置文件示例
+    
+    # 数据目录
+    data_directory=/var/lib/postgresql/data
+    
+    # 字符编码和区域设置
+    encoding=UTF8
+    locale=en_US.UTF-8
+    # lc_collate=en_US.UTF-8
+    # lc_ctype=en_US.UTF-8
+    
+    # 超级用户
+    superuser=postgres
+    # password=  # 留空表示无密码，或使用 pwfile
+    
+    # 网络配置
+    listen_addresses=localhost
+    port=5432
+    max_connections=100
+    
+    # 认证方式
+    auth_method=scram-sha-256
+    # auth_host=scram-sha-256
+    # auth_local=peer
+    
+    # 配置模板（可选）
+    # profile=production
+    
+    # 服务器控制
+    start_server=yes
+
+支持的配置键：
+
+  data_directory      - 数据目录路径
+  encoding            - 字符编码
+  locale              - 区域设置
+  lc_collate          - LC_COLLATE 设置
+  lc_ctype            - LC_CTYPE 设置
+  superuser           - 超级用户名
+  password            - 超级用户密码（不推荐在文件中存储）
+  pwfile              - 密码文件路径
+  listen_addresses    - 监听地址
+  port                - 端口号
+  max_connections     - 最大连接数
+  auth_method         - 默认认证方式
+  auth_host           - 主机连接认证方式
+  auth_local          - 本地连接认证方式
+  profile             - 配置模板
+  start_server        - 是否启动服务器（yes/no）
+
+注意：
+- 命令行参数优先于配置文件中的设置
+- 布尔值使用 yes/no 或 true/false
+- 路径可以使用绝对路径或相对路径
+- 密码建议使用 pwfile 而不是直接在配置文件中指定
+
+
+使用示例
+--------
+
+1. 基本交互式安装：
+
+   $ pg_setup
+   
+   按照提示输入配置信息，工具会引导您完成整个安装过程。
+
+2. 指定数据目录的交互式安装：
+
+   $ pg_setup -D /var/lib/postgresql/data
+
+3. 使用开发模板快速安装：
+
+   $ pg_setup -D /home/user/pgdata -P development
+   
+   使用开发模式的默认设置，适合本地开发。
+
+4. 生产环境安装：
+
+   $ pg_setup -D /var/lib/postgresql/data \
+              -U postgres \
+              -W \
+              -P production \
+              --no-start
+   
+   使用生产模式，提示输入密码，初始化后不自动启动。
+
+5. 自定义网络配置：
+
+   $ pg_setup -D /var/lib/postgresql/data \
+              -p 5433 \
+              --listen-addresses='*' \
+              -A scram-sha-256
+
+6. 使用配置文件安装：
+
+   $ pg_setup -g myconfig.conf
+   $ vi myconfig.conf  # 编辑配置
+   $ pg_setup -c myconfig.conf
+
+7. 静默安装（用于脚本）：
+
+   $ pg_setup -s \
+              -D /var/lib/postgresql/data \
+              -U postgres \
+              --pwfile=/etc/postgresql/pgpass \
+              -P production
+
+8. 测试环境安装：
+
+   $ pg_setup -D /tmp/testdb -P test
+   
+   使用测试模式，端口 5433，自动启动。
+
+
+故障排查指南
+------------
+
+### 问题：数据目录已存在且非空
+
+错误信息：
+  ERROR: data directory "/path/to/data" exists and is not empty
+
+解决方法：
+  1. 确认目录中没有重要数据
+  2. 删除或移动现有目录：
+     $ rm -rf /path/to/data
+     或
+     $ mv /path/to/data /path/to/data.backup
+  3. 重新运行 pg_setup
+
+### 问题：端口已被占用
+
+错误信息：
+  ERROR: port 5432 is already in use
+
+解决方法：
+  1. 检查是否有其他 PostgreSQL 实例正在运行：
+     $ ps aux | grep postgres
+  2. 使用不同的端口：
+     $ pg_setup -D /path/to/data -p 5433
+  3. 或停止占用端口的进程
+
+### 问题：权限不足
+
+错误信息：
+  ERROR: could not create directory "/path/to/data": Permission denied
+
+解决方法：
+  1. 使用有权限的目录：
+     $ pg_setup -D ~/pgdata
+  2. 或使用 sudo 创建目录并设置权限：
+     $ sudo mkdir -p /var/lib/postgresql/data
+     $ sudo chown $USER /var/lib/postgresql/data
+     $ pg_setup -D /var/lib/postgresql/data
+
+### 问题：无效的字符编码
+
+错误信息：
+  ERROR: invalid encoding name "XXX"
+
+解决方法：
+  1. 查看支持的编码列表：
+     $ psql -l
+  2. 使用有效的编码名称：
+     $ pg_setup -D /path/to/data -E UTF8
+
+### 问题：无效的区域设置
+
+错误信息：
+  ERROR: invalid locale name "xxx"
+
+解决方法：
+  1. 查看系统可用的区域设置：
+     $ locale -a
+  2. 使用系统支持的区域设置：
+     $ pg_setup -D /path/to/data -L en_US.UTF-8
+  3. 或安装所需的区域设置：
+     $ sudo locale-gen zh_CN.UTF-8
+
+
+### 问题：initdb 执行失败
+
+错误信息：
+  ERROR: initdb failed with exit code X
+
+解决方法：
+  1. 检查详细错误信息（通常会显示在输出中）
+  2. 确保有足够的磁盘空间：
+     $ df -h /path/to/data
+  3. 检查数据目录权限：
+     $ ls -ld /path/to/data
+  4. 使用 --debug 选项获取更多信息：
+     $ pg_setup -D /path/to/data --debug
+
+### 问题：服务器启动失败
+
+错误信息：
+  ERROR: could not start server
+
+解决方法：
+  1. 检查 PostgreSQL 日志文件：
+     $ cat /path/to/data/log/postgresql-*.log
+  2. 检查端口是否被占用：
+     $ netstat -an | grep 5432
+  3. 手动启动服务器查看详细错误：
+     $ pg_ctl -D /path/to/data -l logfile start
+  4. 检查配置文件是否正确：
+     $ cat /path/to/data/postgresql.conf
+
+### 问题：无法连接到数据库
+
+错误信息：
+  ERROR: could not connect to database
+
+解决方法：
+  1. 确认服务器正在运行：
+     $ pg_ctl -D /path/to/data status
+  2. 检查监听地址和端口配置：
+     $ grep listen_addresses /path/to/data/postgresql.conf
+     $ grep port /path/to/data/postgresql.conf
+  3. 检查防火墙设置
+  4. 检查 pg_hba.conf 认证配置：
+     $ cat /path/to/data/pg_hba.conf
+
+### 问题：安全警告
+
+警告信息：
+  WARNING: using trust authentication is not secure
+
+说明：
+  这是正常的安全提示，不是错误。trust 认证允许无密码连接。
+
+解决方法：
+  1. 开发环境可以忽略此警告
+  2. 生产环境应使用安全的认证方式：
+     $ pg_setup -D /path/to/data -A scram-sha-256 -W
+
+### 问题：配置文件解析错误
+
+错误信息：
+  WARNING: ignoring invalid line X in configuration file
+
+解决方法：
+  1. 检查配置文件格式是否正确（key=value）
+  2. 确保没有多余的空格或特殊字符
+  3. 检查是否有拼写错误
+  4. 使用生成的模板作为参考：
+     $ pg_setup -g template.conf
+
+
+### 调试技巧
+
+1. 使用调试模式：
+   $ pg_setup -D /path/to/data --debug
+
+2. 保留失败时的文件（不清理）：
+   $ pg_setup -D /path/to/data --noclean
+
+3. 查看详细日志：
+   检查数据目录中的日志文件
+
+4. 手动验证配置：
+   $ cat /path/to/data/postgresql.conf
+   $ cat /path/to/data/pg_hba.conf
+
+5. 测试数据库连接：
+   $ psql -h localhost -p 5432 -U postgres
+
+安全建议
+--------
+
+1. 生产环境配置：
+   - 始终使用 scram-sha-256 或更强的认证方式
+   - 为超级用户设置强密码
+   - 限制监听地址（避免使用 0.0.0.0）
+   - 使用防火墙限制访问
+   - 定期更新 PostgreSQL 版本
+
+2. 密码管理：
+   - 不要在命令行中直接输入密码（会记录在历史中）
+   - 使用 --pwfile 从文件读取密码
+   - 密码文件应设置严格的权限（chmod 600）
+   - 不要在配置文件中存储明文密码
+
+3. 文件权限：
+   - 数据目录权限应为 0700（仅所有者可访问）
+   - 配置文件权限应为 0600
+   - 密码文件权限应为 0600
+
+4. 网络安全：
+   - 仅在必要时允许远程连接
+   - 使用 SSL/TLS 加密连接
+   - 在 pg_hba.conf 中限制允许连接的 IP 地址
+   - 考虑使用 VPN 或 SSH 隧道
+
+5. 审计和监控：
+   - 启用日志记录
+   - 定期检查日志文件
+   - 监控异常连接尝试
+   - 定期备份数据
+
+环境变量
+--------
+
+pg_setup 支持以下环境变量：
+
+  PGDATA
+      默认数据目录路径
+      可被 -D 选项覆盖
+
+  PGPORT
+      默认端口号
+      可被 -p 选项覆盖
+
+  PGUSER
+      默认超级用户名
+      可被 -U 选项覆盖
+
+  LANG, LC_ALL
+      影响默认区域设置
+
+
+文件和目录
+----------
+
+安装后，数据目录将包含以下文件和子目录：
+
+  postgresql.conf     - 主配置文件
+  pg_hba.conf         - 客户端认证配置文件
+  pg_ident.conf       - 用户名映射配置文件
+  PG_VERSION          - PostgreSQL 版本号
+  base/               - 数据库文件
+  global/             - 全局表
+  pg_wal/             - 预写日志（WAL）文件
+  pg_xact/            - 事务提交状态数据
+  pg_multixact/       - 多事务状态数据
+  log/                - 日志文件（如果配置了）
+
+重要配置文件说明：
+
+  postgresql.conf
+      包含服务器配置参数，如监听地址、端口、内存设置等
+      pg_setup 会自动配置基本参数
+
+  pg_hba.conf
+      控制客户端认证
+      pg_setup 会根据指定的认证方式配置此文件
+
+限制和注意事项
+--------------
+
+1. 数据目录必须为空或不存在
+   pg_setup 不会覆盖现有的数据库集群
+
+2. 端口范围限制
+   端口号必须在 1024-65535 范围内
+
+3. 用户名限制
+   超级用户名必须符合 PostgreSQL 命名规则
+   （字母开头，包含字母、数字、下划线）
+
+4. 区域设置
+   指定的区域设置必须在系统中已安装
+
+5. 权限要求
+   运行 pg_setup 的用户必须对数据目录有写权限
+
+6. 磁盘空间
+   确保有足够的磁盘空间（建议至少 100MB 用于初始化）
+
+相关工具
+--------
+
+  initdb
+      PostgreSQL 数据库集群初始化工具
+      pg_setup 内部使用 initdb
+
+  pg_ctl
+      PostgreSQL 服务器控制工具
+      用于启动、停止、重启数据库服务器
+
+  psql
+      PostgreSQL 交互式终端
+      用于连接和管理数据库
+
+  createdb
+      创建新数据库
+
+  createuser
+      创建新用户
+
+
+常见问题 (FAQ)
+--------------
+
+Q: pg_setup 和 initdb 有什么区别？
+A: pg_setup 是一个更高级的工具，它整合了 initdb 和 pg_ctl 的功能，
+   提供交互式向导、配置模板和自动服务器启动等功能。initdb 是底层
+   工具，需要更多手动配置。
+
+Q: 可以在现有的数据目录上运行 pg_setup 吗？
+A: 不可以。pg_setup 要求数据目录为空或不存在。如果需要重新配置
+   现有数据库，请使用 pg_ctl 和手动编辑配置文件。
+
+Q: 如何更改已安装数据库的配置？
+A: 编辑数据目录中的 postgresql.conf 和 pg_hba.conf 文件，然后
+   重启数据库服务器：
+   $ pg_ctl -D /path/to/data restart
+
+Q: 静默模式需要哪些必需参数？
+A: 至少需要指定数据目录（-D）。其他参数会使用默认值。建议也指定
+   超级用户名（-U）和配置模板（-P）。
+
+Q: 如何卸载或删除数据库集群？
+A: 首先停止服务器：
+   $ pg_ctl -D /path/to/data stop
+   然后删除数据目录：
+   $ rm -rf /path/to/data
+
+Q: 可以同时运行多个 PostgreSQL 实例吗？
+A: 可以。每个实例需要使用不同的数据目录和端口号：
+   $ pg_setup -D /path/to/data1 -p 5432
+   $ pg_setup -D /path/to/data2 -p 5433
+
+Q: 如何备份配置以便在其他服务器上使用？
+A: 使用 --generate-config 生成配置文件，然后在其他服务器上使用：
+   服务器 A：$ pg_setup -g myconfig.conf
+   服务器 B：$ pg_setup -c myconfig.conf
+
+Q: trust 认证安全吗？
+A: 不安全。trust 认证允许任何人无密码连接。仅在开发环境或完全
+   隔离的网络中使用。生产环境应使用 scram-sha-256。
+
+Q: 如何启用 SSL 连接？
+A: pg_setup 不自动配置 SSL。需要手动配置：
+   1. 生成 SSL 证书
+   2. 编辑 postgresql.conf 启用 SSL
+   3. 重启服务器
+
+Q: 可以更改数据目录的位置吗？
+A: 初始化后不能更改。需要使用新位置重新运行 pg_setup，或使用
+   pg_dump/pg_restore 迁移数据。
+
+
+性能调优建议
+------------
+
+pg_setup 使用合理的默认配置，但您可能需要根据硬件和工作负载调整：
+
+1. 内存设置（编辑 postgresql.conf）：
+   shared_buffers = 25% of RAM
+   effective_cache_size = 50-75% of RAM
+   work_mem = RAM / max_connections / 4
+
+2. 连接数：
+   使用 -P 选项或在配置文件中设置 max_connections
+   开发：20-50
+   生产：100-200（根据需求）
+
+3. 日志配置：
+   启用慢查询日志
+   设置适当的日志级别
+
+4. 检查点配置：
+   调整 checkpoint_timeout 和 max_wal_size
+
+详细的性能调优请参考 PostgreSQL 官方文档。
+
+版本兼容性
+----------
+
+pg_setup 1.0 兼容 PostgreSQL 16 及更高版本。
+
+对于旧版本的 PostgreSQL，请使用 initdb 工具。
+
+更新日志
+--------
+
+版本 1.0（初始版本）：
+- 交互式安装向导
+- 静默安装模式
+- 配置模板（开发、生产、测试）
+- 配置文件支持
+- 自动服务器启动
+- 安全性检查
+- 错误回滚功能
+
+贡献和反馈
+----------
+
+如果您发现 bug 或有功能建议，请报告到 PostgreSQL 邮件列表或
+提交到 PostgreSQL bug 跟踪系统。
+
+许可证
+------
+
+pg_setup 是 PostgreSQL 的一部分，使用 PostgreSQL 许可证。
+
+参考资料
+--------
+
+PostgreSQL 官方文档：
+  https://www.postgresql.org/docs/
+
+initdb 文档：
+  https://www.postgresql.org/docs/current/app-initdb.html
+
+pg_ctl 文档：
+  https://www.postgresql.org/docs/current/app-pg-ctl.html
+
+PostgreSQL 配置：
+  https://www.postgresql.org/docs/current/runtime-config.html
+
+客户端认证：
+  https://www.postgresql.org/docs/current/client-authentication.html
+
+作者
+----
+
+PostgreSQL Global Development Group
+
