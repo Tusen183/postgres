@@ -1,0 +1,5 @@
+# pg_tree_viz extension
+comment = 'visualize SQL query parse trees in RAW or DOT format'
+default_version = '1.0'
+module_pathname = '$libdir/pg_tree_viz'
+relocatable = true
