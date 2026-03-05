@@ -1,0 +1,13 @@
+[submodule "contrib/documentdb"]
+	path = contrib/documentdb
+	url = git@github.com:Tusen183/documentdb.git
+	branch = develop
+[submodule "contrib/pg_cron"]
+	path = contrib/pg_cron
+	url = https://github.com/citusdata/pg_cron.git
+[submodule "contrib/pgvector"]
+	path = contrib/pgvector
+	url = https://github.com/pgvector/pgvector.git
+[submodule "contrib/rum"]
+	path = contrib/rum
+	url = https://github.com/postgrespro/rum.git
