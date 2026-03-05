@@ -1,0 +1,277 @@
+variables:
+  - &test_image 'repo.osgeo.org/postgis/build-test:trisquel3'
+  - common_doc_paths: &common_doc_paths
+      # related config files
+      - ".woodpecker/docs.yml"
+      # Makefiles
+      - "doc/Makefile.in"
+      - "doc/html/images/Makefile.in"
+      # XML sources
+      - "doc/*.xml"
+      # Internationalization Makefiles
+      - "doc/po/Makefile.local"
+  - &when_path
+      include:
+        - <<: *common_doc_paths
+  - &when_path_full
+      include:
+        - <<: *common_doc_paths
+        # Any localized assets
+        - "doc/po/*/Makefile.in"
+        - "doc/po/*/*.po"
+
+steps:
+  prepare:
+    image: *test_image
+    pull: true
+    commands:
+      - ./autogen.sh
+      - mkdir -p build-docs && cd build-docs
+      - ../configure --without-pg --without-protobuf --without-raster
+      - make postgis_revision.h
+      - xmllint --version
+    when:
+        - event: push
+          path: *when_path_full
+          
+  check-xml:
+    image: *test_image
+    pull: true
+    depends_on: prepare
+    commands:
+      - make -C build-docs/doc check
+    when:
+      - path: *when_path
+        event: [tag, pull_request, push]
+  build-images:
+    image: *test_image
+    pull: true
+    depends_on: prepare
+    commands:
+      - make -C build-docs/doc images
+    when:
+      - path: *when_path_full
+        event: [tag, pull_request, push]
+  build-html:
+    image: *test_image
+    pull: true
+    depends_on: check-xml
+    commands:
+      - make -C build-docs/doc html
+    when:
+      - path: *when_path
+        event: [tag, pull_request, push]
+  build-cheatsheets:
+    image: *test_image
+    pull: true
+    depends_on: check-xml
+    commands:
+      - make -C build-docs/doc/ cheatsheets
+    when:
+      - path: *when_path
+        event: [tag, pull_request, push]
+  build-chunked-html:
+    image: *test_image
+    pull: true
+    depends_on: check-xml
+    commands:
+      - make -C build-docs/doc html
+    when:
+      - path: *when_path
+        event: [tag, pull_request, push]
+  build-pdf:
+    image: *test_image
+    pull: true
+    depends_on: [ build-images, check-xml ]
+    commands:
+      - make -C build-docs/doc/ pdf
+    when:
+      - path: *when_path
+        event: [tag, pull_request, push]
+
+  # DO NOT EDIT PAST THIS LINE, use update-docs-localized.sh to update #
+### TARGET check-xml
+  check-xml-ja:
+    image: *test_image
+    pull: true
+    commands:
+      - make -C build-docs/doc/po/ja local-check-xml
+    depends_on: prepare
+    when:
+      - event: push
+        path:
+          include:
+            - "doc/po/ja/*.po"
+        
+  check-xml-de:
+    image: *test_image
+    pull: true
+    commands:
+      - make -C build-docs/doc/po/de local-check-xml
+    depends_on: prepare
+    when:
+      - event: push
+        path:
+          include:
+            - "doc/po/de/*.po"
+        
+  check-xml-fr:
+    image: *test_image
+    pull: true
+    commands:
+      - make -C build-docs/doc/po/fr local-check-xml
+    depends_on: prepare
+    when:
+      - event: push
+        path:
+          include:
+            - "doc/po/fr/*.po"
+        
+### TARGET html
+  html-ja:
+    image: *test_image
+    pull: true
+    commands:
+      - make -C build-docs/doc/po/ja local-html
+    depends_on: check-xml-ja
+    when:
+      - event: push
+        path:
+          include:
+            - "doc/po/ja/*.po"
+        
+  html-de:
+    image: *test_image
+    pull: true
+    commands:
+      - make -C build-docs/doc/po/de local-html
+    depends_on: check-xml-de
+    when:
+      - event: push
+        path:
+          include:
+            - "doc/po/de/*.po"
+        
+  html-fr:
+    image: *test_image
+    pull: true
+    commands:
+      - make -C build-docs/doc/po/fr local-html
+    depends_on: check-xml-fr
+    when:
+      - event: push
+        path:
+          include:
+            - "doc/po/fr/*.po"
+        
+### TARGET cheatsheets
+  cheatsheets-ja:
+    image: *test_image
+    pull: true
+    commands:
+      - make -C build-docs/doc/po/ja local-cheatsheets
+    depends_on: check-xml-ja
+    when:
+      - event: push
+        path:
+          include:
+            - "doc/po/ja/*.po"
+        
+  cheatsheets-de:
+    image: *test_image
+    pull: true
+    commands:
+      - make -C build-docs/doc/po/de local-cheatsheets
+    depends_on: check-xml-de
+    when:
+      - event: push
+        path:
+          include:
+            - "doc/po/de/*.po"
+        
+  cheatsheets-fr:
+    image: *test_image
+    pull: true
+    commands:
+      - make -C build-docs/doc/po/fr local-cheatsheets
+    depends_on: check-xml-fr
+    when:
+      - event: push
+        path:
+          include:
+            - "doc/po/fr/*.po"
+        
+### TARGET check-cheatsheets
+  check-cheatsheets-ja:
+    image: *test_image
+    pull: true
+    commands:
+      - make -C build-docs/doc/po/ja local-check-cheatsheets
+    depends_on: cheatsheets-ja
+    when:
+      - event: push
+        path:
+          include:
+            - "doc/po/ja/*.po"
+        
+  check-cheatsheets-de:
+    image: *test_image
+    pull: true
+    commands:
+      - make -C build-docs/doc/po/de local-check-cheatsheets
+    depends_on: cheatsheets-de
+    when:
+      - event: push
+        path:
+          include:
+            - "doc/po/de/*.po"
+        
+  check-cheatsheets-fr:
+    image: *test_image
+    pull: true
+    commands:
+      - make -C build-docs/doc/po/fr local-check-cheatsheets
+    depends_on: cheatsheets-fr
+    when:
+      - event: push
+        path:
+          include:
+            - "doc/po/fr/*.po"
+        
+### TARGET pdf
+  pdf-ja:
+    image: *test_image
+    pull: true
+    commands:
+      - make -C build-docs/doc/po/ja local-pdf
+    depends_on: [ build-images, check-xml-ja ]
+    when:
+      - event: push
+        path:
+          include:
+            - "doc/po/ja/*.po"
+        
+  pdf-de:
+    image: *test_image
+    pull: true
+    commands:
+      - make -C build-docs/doc/po/de local-pdf
+    depends_on: [ build-images, check-xml-de ]
+    when:
+      - event: push
+        path:
+          include:
+            - "doc/po/de/*.po"
+        
+  pdf-fr:
+    image: *test_image
+    pull: true
+    commands:
+      - make -C build-docs/doc/po/fr local-pdf
+    depends_on: [ build-images, check-xml-fr ]
+    when:
+      - event: push
+        path:
+          include:
+            - "doc/po/fr/*.po"
+        
