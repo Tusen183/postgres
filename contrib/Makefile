@@ -19,6 +19,7 @@ SUBDIRS = \
 		dblink		\
 		dict_int	\
 		dict_xsyn	\
+		documentdb	\
 		earthdistance	\
 		file_fdw	\
 		fuzzystrmatch	\
@@ -44,18 +45,18 @@ SUBDIRS = \
 		pg_visibility	\
 		pg_walinspect	\
 		postgres_fdw	\
-		pg_vector		\
+		pgvector		\
+		rum		\
 		seg		\
 		spi		\
-		rum		\
 		tablefunc	\
 		tcn		\
 		test_decoding	\
 		tsm_system_rows \
 		tsm_system_time \
 		unaccent	\
-		vacuumlo 	
-			
+		vacuumlo
+
 
 ifeq ($(with_ssl),openssl)
 SUBDIRS += pgcrypto sslinfo

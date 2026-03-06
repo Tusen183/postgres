@@ -1,3 +1,5 @@
 /Makefile.global
 /Makefile.port
 /Makefile.custom
+.kiro/
+book/
